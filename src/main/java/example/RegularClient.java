@@ -17,21 +17,7 @@ import java.io.*;
 public class RegularClient implements RequestThread.RequestGenerateThreadCallBack {
 
     public static void main(String[] args) {
-
-        try {
-            Rados cluster = new Rados("admin");
-            System.out.println("Created cluster handle.");
-
-            File f = new File("/etc/ceph/ceph.conf");
-            cluster.confReadFile(f);
-            System.out.println("Read the configuration file.");
-
-            cluster.connect();
-            System.out.println("Connected to the cluster.");
-
-        } catch (RadosException e) {
-            System.out.println(e.getMessage() + ": " + e.getReturnValue());
-        }
+        System.out.println(System.getProperty("sun.java.command"));
 
         RegularClient regularClient = new RegularClient();
 
@@ -122,13 +108,90 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
         }
     }
 
+    String runCommand(String command) {
+        ProcessBuilder processBuilder = new ProcessBuilder();
+
+        processBuilder.command("bash", "-c", command);
+
+        try {
+            Process process = processBuilder.start();
+
+            StringBuilder output = new StringBuilder();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line + "\n");
+            }
+
+            int exitVal = process.waitFor();
+            if (exitVal == 0) {
+                System.out.println("Success!");
+                return output.toString();
+            } else {
+                //Error
+            }
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+
     private void generateRequest(RequestGenerator generator, int numOfRequests) {
         int numThreads = Config.getInstance().getNumberOfThreads();
+
         RequestService service = new RequestService(numThreads,
                 Config.getInstance().getReadWriteInterArrivalRate(),
                 numOfRequests,
                 generator,
-                this);
+                new RequestThread.RequestGenerateThreadCallBack() {
+
+                    @Override
+                    public void onRequestGenerated(Request request, int threadId) {
+                        if (generator instanceof SmartRequestGenerator) {
+                            if (request.getCommand() == Request.Command.WRITE) {
+                                System.out.println("We got a write");
+                                System.out.println(request.getFilename());
+
+                                String filename = request.getFilename();
+                                filename = filename.replaceAll("\\\\", "/");
+                                String[] splitArr = filename.split("/");
+                                StringBuilder pathName=new StringBuilder();
+                                int count=0;
+                                while(count<splitArr.length - 1) {
+                                     pathName.append(splitArr[count]+"/");
+                                     count++;
+                                }
+
+                                pathName.deleteCharAt(pathName.length()-1);
+
+                                String fileName = splitArr[splitArr.length-1];
+                                System.out.println(pathName + " " + fileName);
+                                System.out.println(request.getSize());
+
+                                //Use the POSIX API directly
+
+                                final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/";
+
+                                String createDirectory = "mkdir -p " + CEPH_FILE_SYSTEM_PATH + pathName;
+
+                                String output = runCommand(createDirectory);
+
+                                System.out.println(output);
+
+                                String createFile = "truncate -s " + request.getSize() + " " + CEPH_FILE_SYSTEM_PATH + pathName + "/" + fileName;
+                                System.out.println(createFile);
+                                output = runCommand(createFile);
+                            }
+                            else if (request.getCommand() == Request.Command.READ) {
+
+                            }
+                        }
+                    }
+                });
 
         service.start();
         ((SmartRequestGenerator)generator).saveDynamicTreeToFile("dynamicTree.txt");
@@ -147,9 +210,7 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
                     1,
                     numOfRequests * numThreads,
                     generator,
-                    (request, threadId) -> {
-                        //todo write callback for each method
-                    });
+            this);
 
             service.start();
             wr.close();
@@ -169,6 +230,7 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
 
     @Override
     public void onRequestGenerated(Request request, int threadId) {
+        System.out.println("This is the -p callback????");
         System.out.println("thread[" + threadId + "]: " +  request);
     }
 }
