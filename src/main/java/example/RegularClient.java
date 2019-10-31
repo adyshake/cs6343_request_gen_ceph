@@ -105,81 +105,64 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
             System.out.println ("Usage: RegularClient -p <src file> <output rank file>");
         }
     }
+    
+    private final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/";
 
-    String runCommand(String command) {
-        ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command("bash", "-c", command);
+    private void writeRequest(String pathName, long fileSize) {
+        //TODO - Test this new method
         try {
-            Process process = processBuilder.start();
-            StringBuilder output = new StringBuilder();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line + "\n");
-            }
-
-            int exitVal = process.waitFor();
-            if (exitVal == 0) {
-                return output.toString();
-            } else {
-                //Error
-            }
-        } catch (IOException | InterruptedException e) {
+            long start = System.currentTimeMillis();
+            RandomAccessFile f = new RandomAccessFile(pathName, "rw");
+            f.setLength(fileSize);
+            long time = System.currentTimeMillis() - start;
+            System.out.printf("Took %.1f seconds to create a file of %.3f GB", time / 1e3, f.length() / 1e9);
+        } catch (IOException e) {
             e.printStackTrace();
         }
-        return "";
     }
 
-    final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/";
+    private void readRequest(String pathName) {
+        //TODO - Test this method
+        File file = new File(pathName);
 
-    void writeRequest(String folderPath, String fileName, long fileSize) {
-        String createDirectory = "mkdir -p " + CEPH_FILE_SYSTEM_PATH + folderPath;
-        System.out.println("Create directory command: "+ createDirectory);
-        runCommand(createDirectory);
+        BufferedReader br = null;
+        try {
+            br = new BufferedReader(new FileReader(file));
+            String st;
+            while ((st = br.readLine()) != null){
+                //Don't really do anything with it
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-        String createFile = "truncate -s " + fileSize + " " + CEPH_FILE_SYSTEM_PATH + folderPath + "/" + fileName;
-        System.out.println("Create file command: " + createFile);
-        runCommand(createFile);
+    private boolean doesFileSystemExist() {
+        return new File(CEPH_FILE_SYSTEM_PATH).exists();
     }
 
     private void generateRequest(RequestGenerator generator, int numOfRequests) {
         int numThreads = Config.getInstance().getNumberOfThreads();
 
+        if (!doesFileSystemExist()) {
+            System.err.println("Ceph file system does not exist");
+            System.exit(0);
+        }
+
         RequestService service = new RequestService(numThreads,
                 Config.getInstance().getReadWriteInterArrivalRate(),
                 numOfRequests,
                 generator,
-                new RequestThread.RequestGenerateThreadCallBack() {
-                    @Override
-                    public void onRequestGenerated(Request request, int threadId) {
-                        if (generator instanceof SmartRequestGenerator) {
-
-                            System.out.println("Request: " + request.getFilename());
-
-                            String filename = request.getFilename();
-                            filename = filename.replaceAll("\\\\", "/");
-                            String[] splitArr = filename.split("/");
-                            StringBuilder folderPath =new StringBuilder();
-                            int count=0;
-                            while(count<splitArr.length - 1) {
-                                folderPath.append(splitArr[count]+"/");
-                                count++;
-                            }
-                            folderPath.deleteCharAt(folderPath.length()-1);
-
-                            String fileName = splitArr[splitArr.length-1];
-                            System.out.println("Folder path: " + folderPath);
-                            System.out.println("File name: " +  fileName);
-                            System.out.println("");
-
-                            if (request.getCommand() == Request.Command.WRITE) {
-                                System.out.println("Write Request");
-                                writeRequest(folderPath.toString(), fileName, request.getSize());
-                            }
-                            else if (request.getCommand() == Request.Command.READ) {
-
-                            }
+                (request, threadId) -> {
+                    if (generator instanceof SmartRequestGenerator) {
+                        System.out.println("Request: " + request.getFilename());
+                        if (request.getCommand() == Request.Command.WRITE) {
+                            System.out.println("Write Request");
+                            writeRequest(CEPH_FILE_SYSTEM_PATH + request.getFilename(), request.getSize());
+                        }
+                        else if (request.getCommand() == Request.Command.READ) {
+                            System.out.println("Read Request");
+                            readRequest(CEPH_FILE_SYSTEM_PATH + request.getFilename());
                         }
                     }
                 });
