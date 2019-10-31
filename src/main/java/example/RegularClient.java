@@ -1,7 +1,5 @@
 package example;
 
-import com.ceph.rados.Rados;
-import com.ceph.rados.exceptions.RadosException;
 import commonmodels.Request;
 import req.FSPropagator;
 import req.RequestService;
@@ -110,14 +108,10 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
 
     String runCommand(String command) {
         ProcessBuilder processBuilder = new ProcessBuilder();
-
         processBuilder.command("bash", "-c", command);
-
         try {
             Process process = processBuilder.start();
-
             StringBuilder output = new StringBuilder();
-
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
             String line;
@@ -127,18 +121,27 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
 
             int exitVal = process.waitFor();
             if (exitVal == 0) {
-                System.out.println("Success!");
                 return output.toString();
             } else {
                 //Error
             }
-
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
         return "";
     }
 
+    final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/";
+
+    void writeRequest(String folderPath, String fileName, long fileSize) {
+        String createDirectory = "mkdir -p " + CEPH_FILE_SYSTEM_PATH + folderPath;
+        System.out.println("Create directory command: "+ createDirectory);
+        runCommand(createDirectory);
+
+        String createFile = "truncate -s " + fileSize + " " + CEPH_FILE_SYSTEM_PATH + folderPath + "/" + fileName;
+        System.out.println("Create file command: " + createFile);
+        runCommand(createFile);
+    }
 
     private void generateRequest(RequestGenerator generator, int numOfRequests) {
         int numThreads = Config.getInstance().getNumberOfThreads();
@@ -148,43 +151,31 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
                 numOfRequests,
                 generator,
                 new RequestThread.RequestGenerateThreadCallBack() {
-
                     @Override
                     public void onRequestGenerated(Request request, int threadId) {
                         if (generator instanceof SmartRequestGenerator) {
+
+                            System.out.println("Request: " + request.getFilename());
+
+                            String filename = request.getFilename();
+                            filename = filename.replaceAll("\\\\", "/");
+                            String[] splitArr = filename.split("/");
+                            StringBuilder folderPath =new StringBuilder();
+                            int count=0;
+                            while(count<splitArr.length - 1) {
+                                folderPath.append(splitArr[count]+"/");
+                                count++;
+                            }
+                            folderPath.deleteCharAt(folderPath.length()-1);
+
+                            String fileName = splitArr[splitArr.length-1];
+                            System.out.println("Folder path: " + folderPath);
+                            System.out.println("File name: " +  fileName);
+                            System.out.println("");
+
                             if (request.getCommand() == Request.Command.WRITE) {
-                                System.out.println("We got a write");
-                                System.out.println(request.getFilename());
-
-                                String filename = request.getFilename();
-                                filename = filename.replaceAll("\\\\", "/");
-                                String[] splitArr = filename.split("/");
-                                StringBuilder pathName=new StringBuilder();
-                                int count=0;
-                                while(count<splitArr.length - 1) {
-                                     pathName.append(splitArr[count]+"/");
-                                     count++;
-                                }
-
-                                pathName.deleteCharAt(pathName.length()-1);
-
-                                String fileName = splitArr[splitArr.length-1];
-                                System.out.println(pathName + " " + fileName);
-                                System.out.println(request.getSize());
-
-                                //Use the POSIX API directly
-
-                                final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/";
-
-                                String createDirectory = "mkdir -p " + CEPH_FILE_SYSTEM_PATH + pathName;
-
-                                String output = runCommand(createDirectory);
-
-                                System.out.println(output);
-
-                                String createFile = "truncate -s " + request.getSize() + " " + CEPH_FILE_SYSTEM_PATH + pathName + "/" + fileName;
-                                System.out.println(createFile);
-                                output = runCommand(createFile);
+                                System.out.println("Write Request");
+                                writeRequest(folderPath.toString(), fileName, request.getSize());
                             }
                             else if (request.getCommand() == Request.Command.READ) {
 

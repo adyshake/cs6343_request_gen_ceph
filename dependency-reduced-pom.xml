@@ -7,6 +7,28 @@
   <build>
     <plugins>
       <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>copy-resources</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${basedir}/target/resources</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/resources</directory>
+                  <filtering>true</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <version>3.1.0</version>
         <executions>
@@ -19,8 +41,8 @@
                 <transformer>
                   <manifestEntries>
                     <Main-Class>example.RegularClient</Main-Class>
-                    <X-Compile-Source-JDK>1.7</X-Compile-Source-JDK>
-                    <X-Compile-Target-JDK>1.7</X-Compile-Target-JDK>
+                    <X-Compile-Source-JDK>1.8</X-Compile-Source-JDK>
+                    <X-Compile-Target-JDK>1.8</X-Compile-Target-JDK>
                   </manifestEntries>
                 </transformer>
               </transformers>

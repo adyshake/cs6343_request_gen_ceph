@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidParameterException;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -174,7 +175,7 @@ public class StaticTree{
     }
 
     static public List<Integer> parseShuffle(String file) throws IOException{
-        try(BufferedReader br=new BufferedReader(new InputStreamReader(new FileInputStream(file),"UTF8"))){
+        try(BufferedReader br=new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))){
             List<Integer> result=new ArrayList<>();
             for(String line;(line=br.readLine())!=null;){
                 if(line.trim().length()==0) continue;
@@ -327,7 +328,7 @@ public class StaticTree{
         protected void parse(Tree tree,String filename,boolean fillEmpty) throws IOException{
             long count=1;
             boolean isRoot = false;
-            try(BufferedReader br=new BufferedReader(new InputStreamReader(new FileInputStream(filename),"UTF8"))){
+            try(BufferedReader br=new BufferedReader(new InputStreamReader(new FileInputStream(filename), StandardCharsets.UTF_8))){
                 for(String line;(line=br.readLine())!=null;++count){
                     //  skip blank line
                     if(line.trim().length()==0) continue;
