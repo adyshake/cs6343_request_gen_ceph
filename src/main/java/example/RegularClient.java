@@ -112,6 +112,8 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
         //TODO - Test this new method
         try {
             long start = System.currentTimeMillis();
+            File file = new File(pathName.substring(0, pathName.lastIndexOf('/')));
+            file.mkdirs();
             RandomAccessFile f = new RandomAccessFile(pathName, "rw");
             f.setLength(fileSize);
             long time = System.currentTimeMillis() - start;
