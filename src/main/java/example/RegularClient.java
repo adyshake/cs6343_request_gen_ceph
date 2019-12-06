@@ -11,6 +11,9 @@ import req.gen.SmartRequestGenerator;
 import util.Config;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class RegularClient implements RequestThread.RequestGenerateThreadCallBack {
 
@@ -115,6 +118,30 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
             RandomAccessFile f = new RandomAccessFile(pathName, "rw");
             f.setLength(fileSize);
             long time = System.currentTimeMillis() - start;
+            System.out.printf("Took %.1f seconds to write a file of %.3f GB", time / 1e3, f.length() / 1e9);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void createFile(String pathName) {
+        //TODO - Test this new method
+        try {
+            long start = System.currentTimeMillis();
+            String dir = pathName.split(CEPH_FILE_SYSTEM_PATH)[1];
+            String base = CEPH_FILE_SYSTEM_PATH;
+            while(dir.indexOf("\\")!=-1) {
+                int index = dir.indexOf("\\");
+
+                String directoryName = dir.substring(0, index);
+                base += "/"+directoryName;
+                new File(base).mkdirs();
+                dir = dir.substring(index+1, dir.length());
+
+            }
+            //Files.createDirectories(new Path());
+            RandomAccessFile f = new RandomAccessFile(pathName, "rw");
+            long time = System.currentTimeMillis() - start;
             System.out.printf("Took %.1f seconds to create a file of %.3f GB", time / 1e3, f.length() / 1e9);
         } catch (IOException e) {
             e.printStackTrace();
@@ -204,7 +231,10 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
 
     @Override
     public void onRequestGenerated(Request request, int threadId) {
-        System.out.println("This is the -p callback????");
         System.out.println("thread[" + threadId + "]: " +  request);
+        if(request.getCommand() == Request.Command.CREATE_FILE){
+            System.out.println("Create Request");
+            createFile(CEPH_FILE_SYSTEM_PATH + request.getFilename());
+        }
     }
 }
