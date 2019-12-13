@@ -109,8 +109,7 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
         }
     }
     
-    private final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/demo";
-    //private final String CEPH_FILE_SYSTEM_PATH = "/home/pc3_ceph_vm1/Downloads/tp";
+    private final String CEPH_FILE_SYSTEM_PATH = "/mnt/demo_cephfs";
 
     private void writeRequest(String pathName, long fileSize) {
         //TODO - Test this new method
