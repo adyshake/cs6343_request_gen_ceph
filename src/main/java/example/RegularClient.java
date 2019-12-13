@@ -109,7 +109,8 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
         }
     }
     
-    private final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/";
+    private final String CEPH_FILE_SYSTEM_PATH = "/mnt/cephfs/demo";
+    //private final String CEPH_FILE_SYSTEM_PATH = "/home/pc3_ceph_vm1/Downloads/tp";
 
     private void writeRequest(String pathName, long fileSize) {
         //TODO - Test this new method
@@ -120,40 +121,46 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
             RandomAccessFile f = new RandomAccessFile(pathName, "rw");
             f.setLength(fileSize);
             long time = System.currentTimeMillis() - start;
-            System.out.printf("Took %.1f seconds to write a file of %.3f GB", time / 1e3, f.length() / 1e9);
+            System.out.printf("WRITE_REQUEST, %d, %d\n", time, f.length());
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void createFile(String pathName) {
+    private void createFile(String pathName, long fileSize) {
         //TODO - Test this new method
         try {
             long start = System.currentTimeMillis();
             String dir = pathName.split(CEPH_FILE_SYSTEM_PATH)[1];
             String base = CEPH_FILE_SYSTEM_PATH;
-            while(dir.indexOf("\\")!=-1) {
-                int index = dir.indexOf("\\");
+            while(dir.indexOf("/")!=-1) {
+                //System.out.println("dir: " + dir);
+                int index = dir.indexOf("/");
 
                 String directoryName = dir.substring(0, index);
                 base += "/"+directoryName;
-                new File(base).mkdirs();
+                //System.out.println("base: " +base);
+                File dirName = new File(base);
+                dirName.mkdirs();
                 dir = dir.substring(index+1, dir.length());
 
             }
-            //Files.createDirectories(new Path());
-            RandomAccessFile f = new RandomAccessFile(pathName, "rw");
+
+            //System.out.println("Creating file" + base+ "/" +dir);
+            //Files.createDirectories(new Path());""
+            RandomAccessFile f = new RandomAccessFile(base+ "/" +dir, "rw");
+            f.close();
             long time = System.currentTimeMillis() - start;
-            System.out.printf("Took %.1f seconds to create a file of %.3f GB", time / 1e3, f.length() / 1e9);
+            System.out.printf("CREATE_FILE, %d, %d\n", time, fileSize);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void readRequest(String pathName) {
+    private void readRequest(String pathName, long fileSize) {
         //TODO - Test this method
+        long start = System.currentTimeMillis();
         File file = new File(pathName);
-
         BufferedReader br = null;
         try {
             br = new BufferedReader(new FileReader(file));
@@ -161,6 +168,9 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
             while ((st = br.readLine()) != null){
                 //Don't really do anything with it
             }
+            long time = System.currentTimeMillis() - start;
+            System.out.printf("READ_REQUEST, %d, %d\n", time, fileSize);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -170,6 +180,7 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
         return new File(CEPH_FILE_SYSTEM_PATH).exists();
     }
 
+    static int numReadWriteRequest = 0;
     private void generateRequest(RequestGenerator generator, int numOfRequests) {
         int numThreads = Config.getInstance().getNumberOfThreads();
 
@@ -184,14 +195,18 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
                 generator,
                 (request, threadId) -> {
                     if (generator instanceof SmartRequestGenerator) {
-                        System.out.println("Request: " + request.getFilename());
+                        //System.out.println("Request: " + request.getFilename());
+                        if (numReadWriteRequest >= 1000) {
+                            System.exit(0);
+                        }
+                        numReadWriteRequest++;
                         if (request.getCommand() == Request.Command.WRITE) {
-                            System.out.println("Write Request");
-                            writeRequest(CEPH_FILE_SYSTEM_PATH + request.getFilename(), request.getSize());
+                            //System.out.println("Write Request");
+                            writeRequest(CEPH_FILE_SYSTEM_PATH + '/' + request.getFilename(), request.getSize());
                         }
                         else if (request.getCommand() == Request.Command.READ) {
-                            System.out.println("Read Request");
-                            readRequest(CEPH_FILE_SYSTEM_PATH + request.getFilename());
+                            //System.out.println("Read Request");
+                            readRequest(CEPH_FILE_SYSTEM_PATH + '/' + request.getFilename(), request.getSize());
                         }
                     }
                 });
@@ -231,12 +246,20 @@ public class RegularClient implements RequestThread.RequestGenerateThreadCallBac
         System.exit(0);
     }
 
+    static int numCreateFiles = 0;
     @Override
     public void onRequestGenerated(Request request, int threadId) {
-        System.out.println("thread[" + threadId + "]: " +  request);
-        if(request.getCommand() == Request.Command.CREATE_FILE){
-            System.out.println("Create Request");
-            createFile(CEPH_FILE_SYSTEM_PATH + request.getFilename());
+        //System.out.println("thread[" + threadId + "]: " +  request);
+        if (numCreateFiles >= 1000) {
+            System.exit(0);
         }
+        else {
+            numCreateFiles++;
+            if(request.getCommand() == Request.Command.CREATE_FILE){
+                //System.out.println("Create Request");
+                createFile(CEPH_FILE_SYSTEM_PATH + request.getFilename(), request.getSize());
+            }
+        }
+
     }
 }
